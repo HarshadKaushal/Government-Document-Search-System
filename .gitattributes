@@ -1,0 +1,15 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Python files should use LF
+*.py text eol=lf
+
+# Explicitly declare text files you want to always be normalized
+*.txt text
+*.md text
+*.json text
+
+# Binary files that should not be modified
+*.pdf binary
+*.png binary
+*.jpg binary
