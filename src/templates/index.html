@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Government Document Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Government Document Search</h1>
+            <p class="subtitle">Search through Income Tax, RBI, and CAQM documents</p>
+        </header>
+
+        <div class="search-container">
+            <form id="searchForm" class="search-form">
+                <div class="search-input-group">
+                    <input 
+                        type="text" 
+                        id="searchQuery" 
+                        name="query" 
+                        placeholder="Enter your search query..." 
+                        required
+                        autocomplete="off"
+                    >
+                    <button type="submit" id="searchBtn">Search</button>
+                </div>
+
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <label for="searchType">Search Type:</label>
+                        <select id="searchType" name="search_type">
+                            <option value="semantic">Semantic (Vector-based)</option>
+                            <option value="keyword">Keyword (BM25)</option>
+                            <option value="both">Both (Compare)</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="sourceFilter">Source:</label>
+                        <select id="sourceFilter" name="source">
+                            <option value="all">All Sources</option>
+                            <option value="income_tax">Income Tax</option>
+                            <option value="rbi">RBI</option>
+                            <option value="caqm">CAQM</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="sectionFilter">Section:</label>
+                        <select id="sectionFilter" name="section">
+                            <option value="all">All Sections</option>
+                            <option value="Circulars">Circulars</option>
+                            <option value="Notifications">Notifications</option>
+                            <option value="Orders">Orders</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="resultSize">Results:</label>
+                        <select id="resultSize" name="size">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="deduplicate" name="deduplicate" checked>
+                            Deduplicate (one per document)
+                        </label>
+                    </div>
+                    
+                    <div class="filter-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="includeSummaries" name="include_summaries">
+                            Include AI summaries
+                        </label>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Searching...</p>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div id="stats" class="stats hidden">
+            <h3>System Statistics</h3>
+            <div id="statsContent"></div>
+        </div>
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+

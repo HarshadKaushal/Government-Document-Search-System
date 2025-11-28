@@ -43,20 +43,66 @@ pip install -r requirements.txt
 - Start Elasticsearch service
 
 ## Usage
-1. Download PDFs:
+
+### 1. Download PDFs
 ```bash
+# Download from all sources
 python src/download_pdfs.py
+
+# Download from specific source
+python src/download_pdfs.py --source income_tax
 ```
 
-2. Process and index documents:
+### 2. Process PDFs
 ```bash
+# Extract text and split into chunks
+python src/process_documents.py
+```
+
+### 3. Index Documents (requires Elasticsearch)
+```bash
+# Index processed documents
+python src/process_and_index.py
+
+# If Elasticsearch has password
 python src/process_and_index.py --es-password YOUR_PASSWORD
+
+# Process and index in one step
+python src/process_and_index.py --download-dir downloads --processed-dir data/processed
 ```
 
-3. Search documents:
+### 4. Search Documents
 ```bash
-python src/search_documents.py --es-password YOUR_PASSWORD "your search query"
+# Basic search
+python src/search_documents.py "income tax return filing"
+
+# Search with source filter
+python src/search_documents.py "banking regulations" --source rbi
+
+# Search with section filter
+python src/search_documents.py "tax rules" --section Circulars
+
+# Get more results
+python src/search_documents.py "pollution control" --size 20
+
+# Show all chunks (no deduplication)
+python src/search_documents.py "monetary policy" --no-deduplicate
 ```
+
+### 5. Web Interface (Optional)
+```bash
+# Start the web server
+python src/run_server.py
+
+# Then open browser to: http://localhost:5000
+```
+
+The web interface provides:
+- Search type selection (Semantic, Keyword, or Both)
+- Filter by source (Income Tax, RBI, CAQM)
+- Filter by section (Circulars, Notifications, Orders)
+- Adjustable result count
+- Beautiful, responsive UI
 
 ## Project Structure
 

@@ -1,123 +1,203 @@
-from scrapers.income_tax_scraper import IncomeTaxScraper
-from scrapers.caqm_scraper import CAQMScraper
-from scrapers.rbi_scraper import RBIScraper
+#!/usr/bin/env python3
+"""
+Main entry point for downloading PDFs from government websites.
+
+This script runs the scrapers for Income Tax, RBI, and CAQM to download
+citizen-relevant PDF documents.
+
+Usage:
+    python src/download_pdfs.py                    # Run all scrapers
+    python src/download_pdfs.py --source rbi       # Run only RBI scraper
+    python src/download_pdfs.py --source all       # Run all scrapers
+    python src/download_pdfs.py --source income_tax,caqm  # Run specific scrapers
+"""
+
+import argparse
+import sys
 import os
-import requests
-import urllib3
-import re
 from datetime import datetime
-import logging
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import time
 
-def sanitize_filename(filename):
-    """Clean filename by removing invalid characters and limiting length"""
-    # Remove invalid characters
-    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
-    # Replace multiple spaces with single space
-    filename = re.sub(r'\s+', ' ', filename)
-    # Limit length (Windows has 260 char limit, using 240 to be safe)
-    if len(filename) > 240:
-        name, ext = os.path.splitext(filename)
-        filename = name[:236] + ext
-    return filename.strip()
+# Add src directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-def format_date(date_str):
-    """Convert various date formats to YYYY-MM-DD"""
-    if not date_str or date_str == 'No date':
-        return ''
+from scrapers import IncomeTaxScraper, RBIScraper, CAQMScraper
+
+# Map source names to scraper classes
+SCRAPER_MAP = {
+    'income_tax': IncomeTaxScraper,
+    'rbi': RBIScraper,
+    'caqm': CAQMScraper,
+    'all': None  # Special case for all scrapers
+}
+
+AVAILABLE_SOURCES = ['income_tax', 'rbi', 'caqm', 'all']
+
+
+def run_scraper(scraper_class, source_name):
+    """
+    Run a single scraper and return results.
+    
+    Args:
+        scraper_class: The scraper class to instantiate
+        source_name: Name of the source (for logging)
+    
+    Returns:
+        tuple: (success: bool, count: int, error_message: str or None)
+    """
+    print(f"\n{'='*80}")
+    print(f"Starting {source_name.upper()} scraper...")
+    print(f"{'='*80}")
+    
+    start_time = time.time()
     
     try:
-        # Try different date formats
-        for fmt in ['%B %d, %Y', '%d %B %Y', '%d/%m/%Y', '%d-%m-%Y']:
-            try:
-                return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d')
-            except ValueError:
-                continue
-    except Exception:
-        return date_str
-    return date_str
-
-def download_pdfs():
-    # Create downloads directory if it doesn't exist
-    if not os.path.exists('downloads'):
-        os.makedirs('downloads')
-    
-    # Initialize scrapers
-    caqm_scraper = CAQMScraper()
-    rbi_scraper = RBIScraper()
-    income_tax_scraper = IncomeTaxScraper()
-    
-    # Get documents from each scraper
-    scrapers = {
-        'caqm': caqm_scraper,
-        'rbi': rbi_scraper,
-        'income_tax': income_tax_scraper
-    }
-    
-    for source, scraper in scrapers.items():
-        print(f"\nProcessing {source.upper()} documents...")
+        scraper = scraper_class()
         documents = scraper.scrape()
         
-        # Create source-specific directory
-        source_dir = os.path.join('downloads', source)
-        if not os.path.exists(source_dir):
-            os.makedirs(source_dir)
+        elapsed_time = time.time() - start_time
         
-        # Download PDFs
-        for doc in documents:
-            try:
-                url = doc['download_link']
-                title = doc['title']
-                date = format_date(doc.get('date', ''))
-                
-                # Create filename with date prefix if available
-                if date:
-                    base_filename = f"{date}_{title}"
-                else:
-                    base_filename = title
-                
-                # Add .pdf extension if not present
-                if not base_filename.lower().endswith('.pdf'):
-                    base_filename += '.pdf'
-                
-                # Sanitize filename
-                filename = sanitize_filename(base_filename)
-                filepath = os.path.join(source_dir, filename)
-                
-                # Skip if file already exists
-                if os.path.exists(filepath):
-                    print(f"Skipping existing file: {filename}")
-                    continue
-                
-                print(f"Downloading: {filename}")
-                response = requests.get(url, verify=False)
-                
-                if response.status_code == 200:
-                    with open(filepath, 'wb') as f:
-                        f.write(response.content)
-                    print(f"Successfully downloaded: {filename}")
-                else:
-                    print(f"Failed to download {filename}. Status code: {response.status_code}")
-                    
-            except Exception as e:
-                print(f"Error downloading document: {str(e)}")
-                continue
+        if documents:
+            print(f"\n[SUCCESS] {source_name.upper()} scraping completed successfully!")
+            print(f"   - Downloaded/Processed: {len(documents)} documents")
+            print(f"   - Time taken: {elapsed_time:.2f} seconds")
+            return True, len(documents), None
+        else:
+            print(f"\n[WARNING] {source_name.upper()} scraping completed but found no new documents.")
+            return True, 0, None
+            
+    except KeyboardInterrupt:
+        print(f"\n[ERROR] {source_name.upper()} scraping interrupted by user.")
+        return False, 0, "Interrupted by user"
+    except Exception as e:
+        elapsed_time = time.time() - start_time
+        error_msg = f"Error during {source_name} scraping: {str(e)}"
+        print(f"\n[ERROR] {error_msg}")
+        print(f"   - Time taken: {elapsed_time:.2f} seconds")
+        import traceback
+        traceback.print_exc()
+        return False, 0, error_msg
+
 
 def main():
-    # Create scrapers
-    income_tax = IncomeTaxScraper()
-    caqm = CAQMScraper()
-    rbi = RBIScraper()
+    """Main function to run the scrapers."""
+    parser = argparse.ArgumentParser(
+        description='Download PDFs from government websites',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python src/download_pdfs.py                    # Run all scrapers
+  python src/download_pdfs.py --source rbi       # Run only RBI scraper
+  python src/download_pdfs.py --source income_tax,caqm  # Run specific scrapers
+        """
+    )
+    
+    parser.add_argument(
+        '--source',
+        type=str,
+        default='all',
+        help=f'Source to scrape: {", ".join(AVAILABLE_SOURCES)} or comma-separated list (default: all)'
+    )
+    
+    parser.add_argument(
+        '--skip-existing',
+        action='store_true',
+        help='Skip already downloaded files (default: enabled)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Parse source argument
+    sources = [s.strip().lower() for s in args.source.split(',')]
+    
+    # Validate sources
+    invalid_sources = [s for s in sources if s not in AVAILABLE_SOURCES and s not in SCRAPER_MAP]
+    if invalid_sources:
+        print(f"[ERROR] Invalid source(s): {', '.join(invalid_sources)}")
+        print(f"   Available sources: {', '.join(AVAILABLE_SOURCES)}")
+        sys.exit(1)
+    
+    # Handle 'all' source
+    if 'all' in sources:
+        sources = ['income_tax', 'rbi', 'caqm']
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    sources = [s for s in sources if not (s in seen or seen.add(s))]
+    
+    # Print header
+    print("\n" + "="*80)
+    print("  Government Document Scraper")
+    print("="*80)
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Sources to scrape: {', '.join(s.upper() for s in sources)}")
+    print(f"Skip existing files: {'Yes' if args.skip_existing else 'No'}")
+    print("="*80)
     
     # Run scrapers
-    print("Processing Income Tax documents...")
-    income_tax.scrape()
+    results = []
+    total_start_time = time.time()
     
-    print("\nProcessing CAQM documents...")
-    caqm.scrape()
+    for source_name in sources:
+        if source_name not in SCRAPER_MAP:
+            print(f"\n[WARNING] Skipping unknown source: {source_name}")
+            continue
+        
+        scraper_class = SCRAPER_MAP[source_name]
+        success, count, error = run_scraper(scraper_class, source_name)
+        
+        results.append({
+            'source': source_name,
+            'success': success,
+            'count': count,
+            'error': error
+        })
+        
+        # Small delay between scrapers to be polite
+        if source_name != sources[-1]:  # Don't delay after last scraper
+            print("\nWaiting 2 seconds before next scraper...")
+            time.sleep(2)
     
-    print("\nProcessing RBI documents...")
-    rbi.scrape()
+    # Print summary
+    total_time = time.time() - total_start_time
+    
+    print("\n" + "="*80)
+    print("  SCRAPING SUMMARY")
+    print("="*80)
+    
+    total_documents = 0
+    successful_scrapers = 0
+    failed_scrapers = 0
+    
+    for result in results:
+        status = "[SUCCESS]" if result['success'] else "[FAILED]"
+        print(f"{result['source'].upper():15} {status:12} {result['count']:4} documents")
+        if result['error']:
+            print(f"  └─ Error: {result['error']}")
+        
+        total_documents += result['count']
+        if result['success']:
+            successful_scrapers += 1
+        else:
+            failed_scrapers += 1
+    
+    print("="*80)
+    print(f"Total documents downloaded/processed: {total_documents}")
+    print(f"Successful scrapers: {successful_scrapers}/{len(results)}")
+    if failed_scrapers > 0:
+        print(f"Failed scrapers: {failed_scrapers}/{len(results)}")
+    print(f"Total time: {total_time:.2f} seconds")
+    print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80 + "\n")
+    
+    # Exit with appropriate code
+    if failed_scrapers > 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
+
+

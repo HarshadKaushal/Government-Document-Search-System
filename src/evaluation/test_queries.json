@@ -1,0 +1,26 @@
+{
+  "test_queries": [
+    {
+      "query": "income tax return filing",
+      "relevant_doc_ids": ["7bbda450049b53b36aabf287981ea82c"],
+      "description": "Query about income tax return filing procedures"
+    },
+    {
+      "query": "RBI monetary policy",
+      "relevant_doc_ids": ["631a1ccab4a1f02a9d0abf93afb494cf"],
+      "description": "Query about RBI monetary policy"
+    },
+    {
+      "query": "air quality management",
+      "relevant_doc_ids": ["391fbf637eb197ce735b0071705f0e81"],
+      "description": "Query about air quality management"
+    },
+    {
+      "query": "banking regulations",
+      "relevant_doc_ids": ["01476445021dec222aabddd4096dfc7a"],
+      "description": "Query about banking regulations"
+    }
+  ],
+  "note": "Add relevant_doc_ids by manually evaluating search results. Format: [\"doc_id1\", \"doc_id2\", ...]"
+}
+

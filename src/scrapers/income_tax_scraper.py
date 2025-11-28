@@ -1,10 +1,9 @@
 from .base_scraper import BaseScraper
+from .metadata_utils import extract_date, clean_title, determine_section, build_filename, extract_release_date_from_pdf
 import requests
 from bs4 import BeautifulSoup
 import os
 import logging
-from datetime import datetime
-import re
 
 class IncomeTaxScraper(BaseScraper):
     def __init__(self):
@@ -21,158 +20,73 @@ class IncomeTaxScraper(BaseScraper):
         }
 
     def scrape(self):
-        """Main scraping method required by BaseScraper"""
         try:
-            # Get all PDF links
             documents = self.find_pdf_links()
-            
-            # Filter documents into citizen-relevant and technical categories
             citizen_documents, technical_documents = self.filter_documents(documents)
-            
-            # Print summary
             print(f"\nFound {len(citizen_documents)} citizen-relevant documents:")
             print("-" * 80)
-            
             for i, doc in enumerate(citizen_documents, 1):
                 print(f"{i}. {doc['title']}")
                 print(f"   Date: {doc['date']}")
                 print(f"   Section: {doc['section']}")
                 print(f"   URL: {doc['url']}")
                 print("-" * 80)
-            
             print(f"\nSkipping {len(technical_documents)} technical documents")
-            
-            # Download only citizen-relevant documents
             download_dir = os.path.join('downloads', 'income_tax', 'citizen_docs')
             os.makedirs(download_dir, exist_ok=True)
-            
             for doc in citizen_documents:
-                filename = self.get_unique_filename(
-                    os.path.basename(doc['url']),
-                    title=doc['title'],
-                    section=doc['section']
-                )
+                filename = build_filename(doc['title'], doc['date'], doc['section'])
                 filepath = os.path.join(download_dir, filename)
-                
                 if os.path.exists(filepath):
                     print(f"Skipping existing file: {filename}")
                     continue
-                
                 print(f"Downloading: {filename}")
                 if self.download_with_retry(doc['url'], filepath):
+                    # Try to extract date from PDF after download
+                    pdf_date = extract_release_date_from_pdf(filepath)
+                    if pdf_date:
+                        print(f"[PDF Date Extracted] {filename}: {pdf_date}")
+                        doc['date'] = pdf_date
                     print(f"Successfully downloaded: {filename}")
                 else:
                     print(f"Failed to download: {filename}")
-            
             return citizen_documents
-            
         except Exception as e:
             logging.error(f"Error during scraping: {e}")
             return []
-
-    def extract_date(self, text):
-        try:
-            # Try to find a date in the text
-            date_patterns = [
-                r'(\d{2})[/-](\d{2})[/-](\d{4})',  # DD/MM/YYYY or DD-MM-YYYY
-                r'(\d{4})[/-](\d{2})[/-](\d{2})',  # YYYY/MM/DD or YYYY-MM-DD
-            ]
-            
-            for pattern in date_patterns:
-                match = re.search(pattern, text)
-                if match:
-                    groups = match.groups()
-                    if len(groups[0]) == 4:  # YYYY-MM-DD format
-                        date_obj = datetime.strptime(f"{groups[0]}-{groups[1]}-{groups[2]}", "%Y-%m-%d")
-                    else:  # DD-MM-YYYY format
-                        date_obj = datetime.strptime(f"{groups[2]}-{groups[1]}-{groups[0]}", "%Y-%m-%d")
-                    return date_obj.strftime("%Y-%m-%d")
-            
-            return datetime.now().strftime("%Y-%m-%d")
-        except Exception as e:
-            logging.warning(f"Error extracting date: {e}")
-            return datetime.now().strftime("%Y-%m-%d")
-
-    def get_unique_filename(self, original_filename, title="", section=""):
-        """Generate a unique filename based on document metadata."""
-        base, ext = os.path.splitext(original_filename)
-        
-        # Clean the base filename
-        base = re.sub(r'[^\w\s-]', '', base)
-        base = base.strip().replace(' ', '_')
-        
-        # Add section prefix if available
-        if section:
-            section = re.sub(r'[^\w\s-]', '', section)
-            section = section.strip().replace(' ', '_')
-            base = f"{section}_{base}"
-        
-        # Handle special cases
-        if "schema" in base.lower():
-            base = f"Schema_{base}"
-        elif "validation" in base.lower():
-            base = f"Validation_{base}"
-        
-        # Add date if found in title
-        date_match = re.search(r'\d{2}[-/]\d{2}[-/]\d{4}', title)
-        if date_match:
-            date_str = date_match.group().replace('/', '-')
-            base = f"{base}_{date_str}"
-        
-        filename = f"{base}{ext}"
-        counter = 1
-        
-        while filename.lower() in self.seen_filenames:
-            filename = f"{base}_{counter}{ext}"
-            counter += 1
-        
-        self.seen_filenames.add(filename.lower())
-        return filename
 
     def find_pdf_links(self):
         documents = []
         session = requests.Session()
         session.headers.update(self.headers)
-
         for url_name, url in self.urls.items():
             try:
                 response = session.get(url)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Find all links
                 links = soup.find_all('a', href=True)
-                
                 for link in links:
                     href = link.get('href', '')
                     if href.lower().endswith('.pdf'):
-                        title = link.get_text().strip()
+                        title = clean_title(link.get_text())
                         if not title:
                             title = os.path.basename(href)
-
-                        # Make the URL absolute if it's relative
                         if not href.startswith(('http://', 'https://')):
                             href = requests.compat.urljoin(self.base_url, href)
-                        
-                        # Determine section based on URL and context
-                        section = url_name.capitalize()
-                        if "schema" in href.lower() or "schema" in title.lower():
-                            section = "Schema"
-                        elif "validation" in href.lower() or "validation" in title.lower():
-                            section = "Validation"
-                        
+                        section = determine_section(title, link)
+                        date = extract_date(title) or extract_date(link.get_text())
+                        if not date:
+                            date = None
                         document = {
                             'title': title,
-                            'date': self.extract_date(title),
+                            'date': date,
                             'url': href,
                             'section': section
                         }
                         documents.append(document)
-
             except requests.exceptions.RequestException as e:
                 logging.error(f"Error fetching {url}: {e}")
                 continue
-
         return documents
 
     def download_with_retry(self, url, filename, max_retries=3):

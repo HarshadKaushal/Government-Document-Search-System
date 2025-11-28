@@ -1,0 +1,55 @@
+================================================================================
+SEARCH ACCURACY EVALUATION REPORT
+================================================================================
+
+SEMANTIC SEARCH METRICS:
+--------------------------------------------------------------------------------
+  F1@10               : 0.1818
+  F1@20               : 0.0952
+  F1@5                : 0.3333
+  MAP                 : 0.7321
+  MRR                 : 0.7083
+  NDCG@10             : 0.7827
+  NDCG@20             : 0.7827
+  NDCG@5              : 0.7827
+  Precision@10        : 0.1000
+  Precision@20        : 0.0500
+  Precision@5         : 0.2000
+  Recall@10           : 1.0000
+  Recall@20           : 1.0000
+  Recall@5            : 1.0000
+  Relevant_Retrieved  : 1.0000
+  Total_Relevant      : 1.0000
+  Total_Retrieved     : 40.0000
+
+KEYWORD SEARCH METRICS:
+--------------------------------------------------------------------------------
+  F1@10               : 0.0455
+  F1@20               : 0.0238
+  F1@5                : 0.0833
+  MAP                 : 0.0614
+  MRR                 : 0.0614
+  NDCG@10             : 0.0967
+  NDCG@20             : 0.0967
+  NDCG@5              : 0.0967
+  Precision@10        : 0.0250
+  Precision@20        : 0.0125
+  Precision@5         : 0.0500
+  Recall@10           : 0.2500
+  Recall@20           : 0.2500
+  Recall@5            : 0.2500
+  Relevant_Retrieved  : 0.5000
+  Total_Relevant      : 1.0000
+  Total_Retrieved     : 40.0000
+
+SEARCH METHOD AGREEMENT:
+--------------------------------------------------------------------------------
+  Documents found by both methods: 7
+  Only in semantic results: 28
+  Only in keyword results: 15
+  Total semantic results: 35
+  Total keyword results: 22
+
+================================================================================
+Report generated. Plots saved to: evaluation_results
+================================================================================
